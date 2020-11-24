@@ -421,3 +421,10 @@ svg:hover {
 
 /*////// icons CSS end /////////////////////////*/
 
+#input-selectors {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.2);
+}

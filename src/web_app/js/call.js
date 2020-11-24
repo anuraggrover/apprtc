@@ -326,6 +326,19 @@ Call.prototype.maybeGetMedia_ = function() {
   return mediaPromise;
 };
 
+Call.prototype.handleSourceDeviceChange = async function(audioDeviceId, videoDeviceId) {
+  const audioConstraints = audioDeviceId ? { deviceId: { exact: audioDeviceId } }: true;
+  const videoConstraints = videoDeviceId ? { deviceId: { exact: videoDeviceId } }: true;
+  const newStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: videoConstraints});
+  const newAudioTrack = newStream.getAudioTracks()[0];
+  const newVideoTrack = newStream.getVideoTracks()[0];
+  const pc = this.pcClient_.pc_;
+  const audioSender = pc.getSenders().find(s => s.track.kind === newAudioTrack.kind);
+  audioSender.replaceTrack(newAudioTrack);
+  const videoSender = pc.getSenders().find(s => s.track.kind === newVideoTrack.kind);
+  videoSender.replaceTrack(newVideoTrack);
+};
+
 // Asynchronously request an ICE server if needed.
 Call.prototype.maybeGetIceServers_ = function() {
   var shouldRequestIceServers =

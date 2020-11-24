@@ -48,6 +48,10 @@ var UI_CONSTANTS = {
   statusDiv: '#status-div',
   turnInfoDiv: '#turn-info-div',
   videosDiv: '#videos',
+  inputSelectors: '#input-selectors',
+  audioInputSelect: '#audioSource',
+  audioOutputSelect: '#audioOutput',
+  videoInputSelect: '#videoSource'
 };
 
 // The controller that connects the Call with the UI.
@@ -70,6 +74,10 @@ var AppController = function(loadingParams) {
   this.newRoomLink_ = $(UI_CONSTANTS.newRoomLink);
   this.rejoinButton_ = $(UI_CONSTANTS.rejoinButton);
   this.newRoomButton_ = $(UI_CONSTANTS.newRoomButton);
+  this.inputSelectors_ = $(UI_CONSTANTS.inputSelectors);
+  this.audioInputSelect_ = $(UI_CONSTANTS.audioInputSelect);
+  this.audioOutputSelect_ = $(UI_CONSTANTS.audioOutputSelect);
+  this.videoInputSelect_ = $(UI_CONSTANTS.videoInputSelect);
 
   this.muteAudioIconSet_ =
       new AppController.IconSet_(UI_CONSTANTS.muteAudioSvg);
@@ -83,6 +91,8 @@ var AppController = function(loadingParams) {
 
   var paramsPromise = Promise.resolve({});
 
+  this.setInputSelectors_();
+
   Promise.resolve(paramsPromise).then(function(newParams) {
     // Merge newly retrieved params with loadingParams.
     if (newParams) {
@@ -95,6 +105,9 @@ var AppController = function(loadingParams) {
         this.onNewRoomClick_.bind(this), false);
     this.rejoinButton_.addEventListener('click',
         this.onRejoinClick_.bind(this), false);
+    this.audioInputSelect_.addEventListener('change', this.onAudioInputChange_.bind(this), false);
+    this.audioOutputSelect_.addEventListener('change', this.onAudioOutputChange_.bind(this), false);
+    this.videoInputSelect_.addEventListener('change', this.onVideoInputChange_.bind(this), false);
 
     this.roomLink_ = '';
     this.roomSelection_ = null;
@@ -134,6 +147,59 @@ var AppController = function(loadingParams) {
   }.bind(this)).catch(function(error) {
     trace('Error initializing: ' + error.message);
   }.bind(this));
+};
+
+AppController.prototype.setInputSelectors_ = async function () {
+  const deviceInfos = await navigator.mediaDevices.enumerateDevices();
+  const audioInputSelect = document.querySelector('select#audioSource');
+  const audioOutputSelect = document.querySelector('select#audioOutput');
+  const videoSelect = document.querySelector('select#videoSource');
+  const selectors = [audioInputSelect, audioOutputSelect, videoSelect];
+
+  // Handles being called several times to update labels. Preserve values.
+  const values = selectors.map(select => select.value);
+  selectors.forEach(select => {
+    while (select.firstChild) {
+      select.removeChild(select.firstChild);
+    }
+  });
+  for (let i = 0; i !== deviceInfos.length; ++i) {
+    const deviceInfo = deviceInfos[i];
+    const option = document.createElement('option');
+    option.value = deviceInfo.deviceId;
+    if (deviceInfo.kind === 'audioinput') {
+      option.text = deviceInfo.label || `microphone ${audioInputSelect.length + 1}`;
+      audioInputSelect.appendChild(option);
+    } else if (deviceInfo.kind === 'audiooutput') {
+      option.text = deviceInfo.label || `speaker ${audioOutputSelect.length + 1}`;
+      audioOutputSelect.appendChild(option);
+    } else if (deviceInfo.kind === 'videoinput') {
+      option.text = deviceInfo.label || `camera ${videoSelect.length + 1}`;
+      videoSelect.appendChild(option);
+    } else {
+      console.log('Some other kind of source/device: ', deviceInfo);
+    }
+  }
+  selectors.forEach((select, selectorIndex) => {
+    if (Array.prototype.slice.call(select.childNodes).some(n => n.value === values[selectorIndex])) {
+      select.value = values[selectorIndex];
+    }
+  });
+};
+
+AppController.prototype.onAudioInputChange_ = function({ target: { value: audioDeviceId }}) {
+  console.log('got audio input change', audioDeviceId);
+  this.call_.handleSourceDeviceChange(audioDeviceId);
+};
+
+AppController.prototype.onAudioOutputChange_ = function({ target: { value: audioDeviceId } }) {
+  console.log('got audio output change', audioDeviceId);
+  this.remoteVideo_.setSinkId(audioDeviceId);
+};
+
+AppController.prototype.onVideoInputChange_ = function({ target: { value: videoDeviceId }}) {
+  console.log('got video input change', videoDeviceId);
+  this.call_.handleSourceDeviceChange(null, videoDeviceId);
 };
 
 AppController.prototype.createCall_ = function() {
@@ -196,6 +262,7 @@ AppController.prototype.setupUi_ = function() {
   this.iconEventSetup_();
   document.onkeypress = this.onKeyPress_.bind(this);
   window.onmousemove = this.showIcons_.bind(this);
+  this.show_(this.inputSelectors_);
 
   $(UI_CONSTANTS.muteAudioSvg).onclick = this.toggleAudioMute_.bind(this);
   $(UI_CONSTANTS.muteVideoSvg).onclick = this.toggleVideoMute_.bind(this);
